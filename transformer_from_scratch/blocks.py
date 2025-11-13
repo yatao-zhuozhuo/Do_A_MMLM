@@ -15,8 +15,8 @@ class EncoderBlock(nn.Module):
         super().__init__()
         # --- YOUR CODE HERE ---
         # TODO: 实例化多头自注意力层和位置前馈网络层。
-        self.self_attn = None    # MultiHeadAttention(...)
-        self.feed_forward = None # PositionwiseFeedForward(...)
+        self.self_attn = MultiHeadAttention(d_model, n_heads, dropout)   # MultiHeadAttention(...)
+        self.feed_forward = PositionwiseFeedForward(d_model, d_ff, dropout) # PositionwiseFeedForward(...)
         # --- END YOUR CODE ---
 
     def forward(self, src: torch.Tensor, src_mask: torch.Tensor) -> torch.Tensor:
@@ -33,11 +33,11 @@ class EncoderBlock(nn.Module):
         
         # 1. 通过多头自注意力层。注意 Q, K, V 都来自 src。
         #    Add & Norm 已在 MultiHeadAttention 内部实现。
-        src = None # Replace this line
+        src = self.self_attn(src, src, src, src_mask)
         
         # 2. 通过位置前馈网络。
         #    Add & Norm 已在 PositionwiseFeedForward 内部实现。
-        src = None # Replace this line
+        src = self.feed_forward(src)
         
         return src
         # --- END YOUR CODE ---
@@ -51,9 +51,9 @@ class DecoderBlock(nn.Module):
         super().__init__()
         # --- YOUR CODE HERE ---
         # TODO: 实例化三个核心组件
-        self.self_attn = None    # 用于目标序列的自注意力
-        self.cross_attn = None   # 用于 encoder 和 decoder 之间的交叉注意力
-        self.feed_forward = None # 位置前馈网络
+        self.self_attn = MultiHeadAttention(d_model, n_heads, dropout)    # 用于目标序列的自注意力
+        self.cross_attn = MultiHeadAttention(d_model, n_heads, dropout)   # 用于 encoder 和 decoder 之间的交叉注意力
+        self.feed_forward = PositionwiseFeedForward(d_model, d_ff, dropout) # 位置前馈网络
         # --- END YOUR CODE ---
 
     def forward(self, tgt: torch.Tensor, enc_src: Optional[torch.Tensor], tgt_mask: Optional[torch.Tensor], src_mask: Optional[torch.Tensor]) -> torch.Tensor:
@@ -71,16 +71,16 @@ class DecoderBlock(nn.Module):
         # TODO: 实现 DecoderBlock 的前向传播
 
         # 1. 掩码多头自注意力。Q, K, V 都来自 tgt，使用 tgt_mask。
-        tgt = None # Replace this line
+        tgt = self.self_attn(tgt, tgt, tgt, tgt_mask)
         
         # 只有在 enc_src (Encoder的输出) 被提供时，才执行交叉注意力。
         if enc_src is not None:
             # 2. 多头交叉注意力。Q 来自上一步的输出，K 和 V 来自 encoder 的输出 enc_src。
             #    使用 src_mask。
-            tgt = None # Replace this line
+            tgt = self.cross_attn(tgt, enc_src, enc_src, src_mask)
         
         # 3. 位置前馈网络。
-        tgt = None # Replace this line
+        tgt = self.feed_forward(tgt)
         
         return tgt
         # --- END YOUR CODE ---

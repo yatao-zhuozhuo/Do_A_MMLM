@@ -14,7 +14,10 @@ class TransformerEncoder(nn.Module):
         super().__init__()
         # --- YOUR CODE HERE ---
         # TODO: 使用 nn.ModuleList 创建一个包含 num_layers 个 EncoderBlock 的列表。
-        self.layers = None # nn.ModuleList([...])
+        self.layers = nn.ModuleList([
+            EncoderBlock(d_model=d_model, n_heads=n_heads, d_ff=d_ff, dropout=dropout)
+            for _ in range(num_layers)
+        ])  # nn.ModuleList([...])
         # --- END YOUR CODE ---
         self.layer_norm = nn.LayerNorm(d_model) # 最后的层归一化
 
@@ -22,7 +25,7 @@ class TransformerEncoder(nn.Module):
         # --- YOUR CODE HERE ---
         # TODO: 依次将 src 通过 ModuleList 中的每一个 EncoderBlock。
         for layer in self.layers:
-            pass # Replace this line
+            src = layer(src, src_mask)
         return self.layer_norm(src)
         # --- END YOUR CODE ---
 
@@ -34,7 +37,10 @@ class TransformerDecoder(nn.Module):
         super().__init__()
         # --- YOUR CODE HERE ---
         # TODO: 使用 nn.ModuleList 创建一个包含 num_layers 个 DecoderBlock 的列表。
-        self.layers = None # nn.ModuleList([...])
+        self.layers = nn.ModuleList([
+            DecoderBlock(d_model=d_model, n_heads=n_heads, d_ff=d_ff, dropout=dropout)
+            for _ in range(num_layers)
+        ]) # nn.ModuleList([...])
         # --- END YOUR CODE ---
         self.layer_norm = nn.LayerNorm(d_model) # 最后的层归一化
 
@@ -42,7 +48,7 @@ class TransformerDecoder(nn.Module):
         # --- YOUR CODE HERE ---
         # TODO: 依次将 tgt 通过 ModuleList 中的每一个 DecoderBlock。
         for layer in self.layers:
-            pass # Replace this line
+            tgt = layer(tgt, enc_output, tgt_mask, src_mask)
         return self.layer_norm(tgt)
         # --- END YOUR CODE ---
 
@@ -63,14 +69,14 @@ class Transformer(nn.Module):
         
         # --- YOUR CODE HERE ---
         # TODO: 实例化模型的各个组件
-        self.src_embedding = None # 源语言的词嵌入层
-        self.tgt_embedding = None # 目标语言的词嵌入层
-        self.pos_encoder = None   # 位置编码器
+        self.src_embedding = nn.Embedding(src_vocab_size, d_model) # 源语言的词嵌入层
+        self.tgt_embedding = nn.Embedding(tgt_vocab_size, d_model) # 目标语言的词嵌入层
+        self.pos_encoder = PositionalEncoding(d_model=d_model, max_len=max_len, dropout=dropout)   # 位置编码器
         
-        self.encoder = None       # TransformerEncoder
-        self.decoder = None       # TransformerDecoder
+        self.encoder = TransformerEncoder(num_layers=num_layers, d_model=d_model, n_heads=n_heads, d_ff=d_ff, dropout=dropout)       # TransformerEncoder
+        self.decoder = TransformerDecoder(num_layers=num_layers, d_model=d_model, n_heads=n_heads, d_ff=d_ff, dropout=dropout)       # TransformerDecoder
         
-        self.fc_out = None        # 最后的线性层，映射到目标词汇表大小
+        self.fc_out = nn.Linear(d_model, tgt_vocab_size)        # 最后的线性层，映射到目标词汇表大小
         # --- END YOUR CODE ---
         
         self.d_model = d_model
@@ -101,20 +107,20 @@ class Transformer(nn.Module):
         #    - 对 src 和 tgt 应用词嵌入。
         #    - 按照论文中的建议，将嵌入结果乘以 sqrt(d_model)。
         #    - 将位置编码应用到经过缩放的嵌入上。
-        src_processed = None # Replace this line
-        tgt_processed = None # Replace this line
+        src_processed = self.pos_encoder(self.src_embedding(src) * math.sqrt(self.d_model))
+        tgt_processed = self.pos_encoder(self.tgt_embedding(tgt) * math.sqrt(self.d_model))
 
         # 2. Encoder
         #    - 将处理后的源序列和源掩码送入 encoder。
-        enc_output = None # Replace this line
+        enc_output = self.encoder(src_processed, src_mask)
 
         # 3. Decoder
         #    - 将处理后的目标序列、encoder的输出、目标掩码和源掩码送入 decoder。
-        dec_output = None # Replace this line
+        dec_output = self.decoder(tgt_processed, enc_output, tgt_mask, src_mask)
         
         # 4. 最终线性层
         #    - 将 decoder 的输出送入最后的线性层，得到 logits。
-        output = None # Replace this line
+        output = self.fc_out(dec_output)
         
         return output
         # --- END YOUR CODE ---
@@ -136,7 +142,7 @@ class Transformer(nn.Module):
         # TODO: 创建填充掩码
         # 1. 创建一个布尔张量，其中 `seq` 中不等于 `pad_idx` 的位置为 True。
         #    shape: [B, L]
-        mask = None # Replace this line
+        mask = (seq != pad_idx)
         
         # 2. 使用 unsqueeze 增加两个维度，以匹配多头注意力的输入格式 [B, H, L_q, L_k]。
         #    最终形状: [B, 1, 1, L]
@@ -160,7 +166,7 @@ class Transformer(nn.Module):
         # TODO: 创建因果掩码
         # 1. 使用 torch.tril 创建一个大小为 (size, size) 的下三角矩阵。
         #    shape: [L, L]
-        mask = None # Replace this line
+        mask = torch.tril(torch.ones((size, size), dtype=torch.bool, device=device))
         
         # 2. 使用 unsqueeze 增加两个维度，以用于广播。
         #    最终形状: [1, 1, L, L]

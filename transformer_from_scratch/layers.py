@@ -21,8 +21,8 @@ class PositionwiseFeedForward(nn.Module):
         # TODO: 定义两个线性层和激活函数
         # 第一个线性层: d_model -> d_ff
         # 第二个线性层: d_ff -> d_model
-        self.w_1 = None # nn.Linear(...)
-        self.w_2 = None # nn.Linear(...)
+        self.w_1 = nn.Linear(d_model,d_ff) # nn.Linear(...)
+        self.w_2 = nn.Linear(d_ff,d_model) # nn.Linear(...)
         self.relu = nn.ReLU()
         # --- END YOUR CODE ---
         
@@ -43,14 +43,16 @@ class PositionwiseFeedForward(nn.Module):
         # TODO: 实现前馈网络的前向传播
         
         # 1. 通过第一个线性层，然后是ReLU激活函数。
-        output = None # Replace this line
+        output = self.w_1(x)
+        output = self.relu(output)
+        output = self.dropout(output)
         
         # 2. 通过第二个线性层。
-        output = None # Replace this line
+        output = self.w_2(output)
         output = self.dropout(output)
         
         # 3. Add & Norm: 添加残差连接并应用 Layer Normalization。
-        output = None # Replace this line
+        output = self.layer_norm(residual + output)
         
         return output
         # --- END YOUR CODE ---
@@ -79,17 +81,19 @@ class PositionalEncoding(nn.Module):
         
         # 1. 创建位置张量 `position`，形状为 [max_len, 1]。
         #    提示: 使用 torch.arange() 和 .unsqueeze(1)
-        position = None # Replace this line
+        position = torch.arange(max_len, dtype=torch.float32).unsqueeze(1)
         
         # 2. 计算除法项 `div_term`。公式为: 1 / (10000^(2i/d_model))
         #    这等价于 exp(2i * (-log(10000.0) / d_model))
         #    `i` 的范围是 [0, 1, ..., d_model/2 - 1]
         #    提示: 使用 torch.arange(0, d_model, 2) 和 torch.exp()
-        div_term = None # Replace this line
+        div_term = torch.exp(torch.arange(0, d_model, 2, dtype=torch.float32) * (-math.log(10000.0) / d_model))
         
         # 3. 为偶数索引应用 sin 函数: pe[:, 0::2] = sin(position * div_term)
+        pe[:, 0::2] = torch.sin(position * div_term)
         
         # 4. 为奇数索引应用 cos 函数: pe[:, 1::2] = cos(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
         
         # --- END YOUR CODE ---
         
@@ -113,7 +117,7 @@ class PositionalEncoding(nn.Module):
         # 提示: x 的序列长度可能小于 max_len，所以需要对 pe进行切片。
         # self.pe 的形状是 [1, max_len, d_model]，它会自动广播到 x 的 batch size。
         # x = x + self.pe[:, :x.size(1), :]
-        x = None # Replace this line
+        x = x + self.pe[:, :x.size(1), :]
         return self.dropout(x)
         # --- END YOUR CODE ---
 
@@ -136,16 +140,16 @@ class LayerNorm(nn.Module):
         
         # 1. 在最后一个维度 (d_model) 上计算均值和方差。
         #    提示: 使用 x.mean(-1, keepdim=True) 和 x.var(-1, keepdim=True)
-        mean = None # Replace this line
-        std = None  # Replace this line
+        mean = x.mean(dim=-1, keepdim=True)
+        var = x.var(dim=-1, keepdim=True, unbiased=False)
         
         # 2. 归一化 x。
         #    公式: (x - mean) / sqrt(var + eps)
-        normalized_x = None # Replace this line
-        
+        normalized_x = (x - mean) / torch.sqrt(var + self.eps)
+
         # 3. 应用可学习的参数 gamma 和 beta。
         #    公式: gamma * normalized_x + beta
-        output = None # Replace this line
+        output = self.gamma * normalized_x + self.beta
         
         return output
         # --- END YOUR CODE ---

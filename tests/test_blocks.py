@@ -1,6 +1,13 @@
 # tests/test_blocks.py
-
+import os
+import sys
 import torch
+
+# 确保项目根目录在 Python 路径中
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from transformer_from_scratch.blocks import EncoderBlock, DecoderBlock
 
 def setup_test_variables():

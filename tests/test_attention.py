@@ -1,10 +1,16 @@
 # tests/test_attention.py
 
+import os
+import sys
 import torch
 import torch.nn as nn
 import math
 
-# 假设项目根目录在 Python 路径中
+# 确保项目根目录在 Python 路径中
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
 from transformer_from_scratch.attention import ScaledDotProductAttention, MultiHeadAttention
 
 # --- 1. 设置测试所需的通用变量 ---

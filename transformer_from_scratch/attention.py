@@ -34,26 +34,28 @@ class ScaledDotProductAttention(nn.Module):
         # 2. 计算 query 和 key 的转置的点积，得到注意力分数 (scores)。
         #    提示: 使用 torch.matmul()。key需要转置最后两个维度。
         #    scores shape: [B, n_heads, L_q, L_k]
-        scores = query @ key.T 
+        scores = torch.matmul(query,key.transpose(-2,-1))
 
         # 3. 对 scores 进行缩放，除以 sqrt(d_k)。
+        scores = scores / math.sqrt(d_k)
         
         # 4. (可选) 应用掩码。如果 mask 不为 None，将 mask 中为 0 (False) 的位置
         #    在 scores 中对应位置替换为一个非常大的负数 (例如 -1e9)。
         #    这使得在 softmax 后，这些位置的概率会趋近于0。
         #    提示: 使用 scores.masked_fill(mask == 0, -1e9)
         if mask is not None:
-            pass # Replace this line
+            scores = scores.masked_fill(mask == 0, float("-inf"))
+
 
         # 5. 对缩放后的 scores 在最后一个维度上应用 softmax，得到注意力权重。
         #    attn_weights shape: [B, n_heads, L_q, L_k]
-        attn_weights = None # Replace this line
+        attn_weights = torch.softmax(scores, dim=-1)
         attn_weights = self.dropout(attn_weights)
 
         # 6. 将注意力权重与 value 相乘，得到最终的输出。
         #    提示: 使用 torch.matmul()。
         #    output shape: [B, n_heads, L_q, d_v]
-        output = None # Replace this line
+        output = torch.matmul(attn_weights, value)
 
         return output
         # --- END YOUR CODE ---
@@ -80,10 +82,10 @@ class MultiHeadAttention(nn.Module):
         # --- YOUR CODE HERE ---
         # TODO: 定义 Q, K, V 的线性投影层和最后的输出线性层。
         # 所有层的输入和输出维度都应为 d_model。
-        self.w_q = None # nn.Linear(...)
-        self.w_k = None # nn.Linear(...)
-        self.w_v = None # nn.Linear(...)
-        self.fc = None  # nn.Linear(...)
+        self.w_q = nn.Linear(d_model,d_model) # nn.Linear(...)
+        self.w_k = nn.Linear(d_model,d_model) # nn.Linear(...)
+        self.w_v = nn.Linear(d_model,d_model) # nn.Linear(...)
+        self.fc = nn.Linear(d_model,d_model)  # nn.Linear(...)
         # --- END YOUR CODE ---
         
         self.attention = ScaledDotProductAttention(dropout)
@@ -118,26 +120,26 @@ class MultiHeadAttention(nn.Module):
         #    - 使用 .view() 将形状从 [B, L, d_model] 变为 [B, L, n_heads, d_k]
         #    - 使用 .transpose(1, 2) 交换 n_heads 和 L 维度，以匹配 attention 函数的输入。
         #    - 最终形状: [B, n_heads, L, d_k]
-        query = None # Replace this line
-        key = None   # Replace this line
-        value = None # Replace this line
+        query = query.view(batch_size, len_q, self.n_heads, self.d_k).transpose(1, 2)
+        key = key.view(batch_size, len_k, self.n_heads, self.d_k).transpose(1, 2)
+        value = value.view(batch_size, len_v, self.n_heads, self.d_k).transpose(1, 2)
 
         # 3. 计算缩放点积注意力: 调用 self.attention。
         #    context shape: [B, n_heads, L_q, d_k]
-        context = None # Replace this line
+        context = self.attention(query, key, value, mask)
 
         # 4. 合并多个头: 这是第2步的逆操作。
         #    - 使用 .transpose(1, 2) 交换回 n_heads 和 L_q 维度。
         #    - 使用 .contiguous() 来确保内存是连续的。
         #    - 使用 .view() 将形状从 [B, L_q, n_heads, d_k] 合并回 [B, L_q, d_model]。
-        context = None # Replace this line
+        context = context.transpose(1, 2).contiguous().view(batch_size, len_q, self.d_model)
 
         # 5. 通过最后的线性层。
-        output = None # Replace this line
+        output = self.fc(context)
         output = self.dropout(output)
 
         # 6. Add & Norm: 添加残差连接并应用 Layer Normalization。
-        output = None # Replace this line
+        output = self.layer_norm(residual + output)
         
         return output
         # --- END YOUR CODE ---
